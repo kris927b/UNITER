@@ -54,9 +54,13 @@ def main(opts):
     eval_dataset = ItmEvalDataset(eval_txt_db, eval_img_db, opts.batch_size)
 
     # Prepare model
-    checkpoint = torch.load(opts.checkpoint)
+    if exists(opts.checkpoint):
+        ckpt_file = opts.checkpoint
+    else:
+        ckpt_file = f'{opts.output_dir}/ckpt/model_step_{opts.checkpoint}.pt'
+    checkpoint = torch.load(ckpt_file)
     model = UniterForImageTextRetrieval.from_pretrained(
-        opts.model_config, checkpoint, img_dim=IMG_DIM)
+        f'{opts.output_dir}/log/model.json', checkpoint, img_dim=IMG_DIM)
     if 'rank_output' not in checkpoint:
         model.init_output()  # zero shot setting
 

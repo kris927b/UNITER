@@ -20,24 +20,27 @@ def itm_eval(score_matrix, txt_ids, img_ids, txt2img, img2txts):
     # image retrieval
     img2j = {i: j for j, i in enumerate(img_ids)}
     _, rank_txt = score_matrix.topk(10, dim=1)
-    gt_img_j = torch.LongTensor([img2j[txt2img[txt_id]]
-                                 for txt_id in txt_ids],
-                                ).to(rank_txt.device
-                                     ).unsqueeze(1).expand_as(rank_txt)
-    rank = (rank_txt == gt_img_j).nonzero()
-    if rank.numel():
-        ir_r1 = (rank < 1).sum().item() / len(txt_ids)
-        ir_r5 = (rank < 5).sum().item() / len(txt_ids)
-        ir_r10 = (rank < 10).sum().item() / len(txt_ids)
-    else:
-        ir_r1, ir_r5, ir_r10 = 0, 0, 0
+    ir_r1, ir_r5, ir_r10 = 0, 0, 0
+    for j, txt_id in enumerate(txt_ids):
+        gt_is = [img2j[txt2img[txt_id]]]
+        ranks = [(rank_txt[j, :] == i).nonzero() for i in gt_is]
+        rank = min([10] + [f.item() for r in ranks for f in r if r.numel()])
+        if rank < 1:
+            ir_r1 += 1
+        if rank < 5:
+            ir_r5 += 1
+        if rank < 10:
+            ir_r10 += 1
+    ir_r1 /= len(txt_ids)
+    ir_r5 /= len(txt_ids)
+    ir_r10 /= len(txt_ids)
 
     # text retrieval
     txt2i = {t: i for i, t in enumerate(txt_ids)}
     _, rank_img = score_matrix.topk(10, dim=0)
     tr_r1, tr_r5, tr_r10 = 0, 0, 0
     for j, img_id in enumerate(img_ids):
-        gt_is = [txt2i[t] for t in img2txts[img_id]]
+        gt_is = [txt2i[img2txts[img_id]]]
         ranks = [(rank_img[:, j] == i).nonzero() for i in gt_is]
         rank = min([10] + [r.item() for r in ranks if r.numel()])
         if rank < 1:

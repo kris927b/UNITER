@@ -76,6 +76,12 @@ class UniterForPretraining(UniterPreTrainedModel):
                                     img_feat, img_pos_feat,
                                     attention_mask, gather_index,
                                     txt_labels, compute_loss)
+        elif task == 'txt':
+            txt_labels = batch['txt_labels']
+            return self.forward_mlm(input_ids, position_ids,
+                                    img_feat, img_pos_feat,
+                                    attention_mask, gather_index,
+                                    txt_labels, compute_loss)
         elif task == 'mrfr':
             img_mask_tgt = batch['img_mask_tgt']
             img_masks = batch['img_masks']

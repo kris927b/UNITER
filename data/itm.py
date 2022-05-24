@@ -382,6 +382,7 @@ class ItmValDataset(DetectFeatTxtTokDataset):
         self.txt2img = self.txt_db.txt2img
         self.img2txts = self.txt_db.img2txts
         self.all_img_ids = list(self.img2txts.keys())
+        self.max_len = 512
 
         assert len(self.img2txts) >= mini_batch_size > 0
         self.bs = mini_batch_size
@@ -420,6 +421,8 @@ class ItmValDataset(DetectFeatTxtTokDataset):
         input_ids = example['input_ids']
         input_ids = self.txt_db.combine_inputs(input_ids)
         input_ids = input_ids.unsqueeze(0).expand(len(img_ids), -1).clone()
+        if input_ids.size(1) > self.max_len:
+            input_ids = input_ids[:, :self.max_len]
         position_ids = torch.arange(0, input_ids.size(1), dtype=torch.long
                                     ).unsqueeze(0)
 

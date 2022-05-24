@@ -214,7 +214,7 @@ class TxtTokLmdb(object):
 
     @property
     def img2txts(self):
-        img2txts = json.load(open(f'{self.db_dir}/img2txts.json'))
+        img2txts = json.load(open(f'{self.db_dir}/img2txt.json'))
         return img2txts
 
 
