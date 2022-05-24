@@ -10,6 +10,7 @@ import pickle
 import os
 from os.path import exists
 
+from nltk.tokenize import word_tokenize
 from cytoolz import curry
 from tqdm import tqdm
 from pytorch_pretrained_bert import BertTokenizer
@@ -52,6 +53,60 @@ def process_nlvr2(jsonl, db, tokenizer, missing=None):
         db[id_] = example
     return id2len, txt2img
 
+
+def process_sbu(captions, found_ids, db, tokenizer):
+    id2len = {}
+    txt2img = {} 
+    img2txt = {}
+    for idx, caption in tqdm(enumerate(captions), desc='processing SBU'):
+        if idx in found_ids:
+            idx = str(idx)
+            img_fname = f"SBU_{idx}.npz"
+            example = {}
+            example['id'] = idx
+            example['image_id'] = idx
+            example['img_fname'] = img_fname
+            example['sent'] = caption[1]
+            tokens = word_tokenize(caption[1])
+            example['toked_caption'] = tokens
+            example['dataset'] = "SBU"
+            example['split'] = "train"
+            input_ids = tokenizer(' '.join(tokens))
+            example['input_ids'] = input_ids
+            example['dataset_image_id'] = idx
+            txt2img[idx] = img_fname
+            img2txt[img_fname] = idx
+            id2len[idx] = len(input_ids)
+            db[idx] = example
+    
+    return id2len, txt2img, img2txt
+
+def process_wit(captions, found_ids, db, tokenizer):
+    id2len = {}
+    txt2img = {} 
+    img2txt = {}
+    for idx, caption in tqdm(enumerate(captions), desc='processing WIT'):
+        if idx in found_ids:
+            idx = str(idx)
+            img_fname = f"WIT_{idx}.npz"
+            example = {}
+            example['id'] = idx
+            example['image_id'] = idx
+            example['img_fname'] = img_fname
+            example['sent'] = caption["caption_reference_description"]
+            tokens = word_tokenize(caption["caption_reference_description"])
+            example['toked_caption'] = tokens
+            example['dataset'] = "SBU"
+            example['split'] = "train"
+            input_ids = tokenizer(' '.join(tokens))
+            example['input_ids'] = input_ids
+            example['dataset_image_id'] = idx
+            txt2img[idx] = img_fname
+            img2txt[img_fname] = idx
+            id2len[idx] = len(input_ids)
+            db[idx] = example
+    
+    return id2len, txt2img, img2txt
 
 def process_referring_expressions(refs, instances, iid_to_ann_ids,
                                   db, tokenizer, split):
@@ -143,6 +198,18 @@ def main(opts):
                     missing_imgs = None
                 jsons = process_nlvr2(
                     ann, db, tokenizer, missing_imgs)
+        elif opts.task == "sbu":
+            captions = json.load(open(opts.annotations[0]))
+            found_ids = open(opts.missing_imgs).read().split("\n")
+            found_ids = list(map(lambda x: int(x), found_ids[:-1]))
+            jsons = process_sbu(captions, found_ids, db, tokenizer)
+            output_field_name = ['id2len', 'txt2img', 'img2txt']
+        elif opts.task == "wit":
+            captions = json.load(open(opts.annotations[0]))
+            found_ids = open(opts.missing_imgs).read().split("\n")
+            found_ids = list(map(lambda x: int(x), found_ids[:-1]))
+            jsons = process_wit(captions, found_ids, db, tokenizer)
+            output_field_name = ['id2len', 'txt2img', 'img2txt']
         elif opts.task == 're':
             data = pickle.load(open(opts.annotations[0], 'rb'))
             instances = json.load(open(opts.annotations[1], 'r'))
@@ -171,7 +238,7 @@ if __name__ == '__main__':
     parser.add_argument('--output', required=True,
                         help='output dir of DB')
     parser.add_argument('--task', required=True, default='nlvr',
-                        choices=['nlvr', 're'])
+                        choices=['nlvr', 're', 'sbu', 'wit'])
     parser.add_argument('--toker', default='bert-base-cased',
                         help='which BERT tokenizer to used')
     args = parser.parse_args()

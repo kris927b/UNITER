@@ -1,0 +1,17 @@
+{
+    "Single Family": 0,
+    "Condo": 1,
+    "Multiple Occupancy": 2,
+    "Vacant Land": 3,
+    "Townhouse": 4,
+    "Recreational": 5,
+    "Country House": 6,
+    "Villa": 0,
+    "Ejerlejlighed": 1,
+    "Kollektiv": 2,
+    "Helårsgrund": 3,
+    "Fritidsgrund": 3,
+    "Rækkehus": 4,
+    "Fritidsbolig": 5,
+    "Landejendom": 6
+}

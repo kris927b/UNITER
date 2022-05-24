@@ -25,8 +25,8 @@ from tqdm import tqdm
 from data import (TokenBucketSampler, TokenBucketSamplerForItm,
                   MetaLoader, PrefetchLoader,
                   TxtTokLmdb, ImageLmdbGroup, ConcatDatasetWithLens,
-                  MlmDataset, MrfrDataset, MrcDataset,
-                  mlm_collate, mrfr_collate, mrc_collate,
+                  MlmDataset, MrfrDataset, MrcDataset,MlmOnlyDataset,
+                  mlm_collate, mrfr_collate, mrc_collate,txt_collate,
                   ItmDataset, itm_collate, itm_ot_collate)
 
 from model.pretrain import UniterForPretraining
@@ -79,6 +79,17 @@ def build_mlm_dataset(txt_db, img_db, is_train, opts):
 
     return dataset, collate_fn
 
+def build_mlm_only_dataset(txt_db, is_train, opts):
+    if is_train:
+        collate_fn = txt_collate
+        datasets = [MlmOnlyDataset(t) for t in txt_db]
+        dataset = ConcatDatasetWithLens(datasets)
+    else:
+        collate_fn = txt_collate
+        dataset = MlmOnlyDataset(txt_db)
+
+    return dataset, collate_fn
+
 
 def build_mrfr_dataset(txt_db, img_db, is_train, opts):
     if is_train:
@@ -120,7 +131,7 @@ def create_dataloaders(datasets, is_train, opts, all_img_dbs=None):
     dataloaders = {}
     for dset in datasets:
         if is_train:
-            assert len(dset['db']) == len(dset['img'])
+            assert len(dset['db']) == len(dset['img']) or dset['tasks'][0] == "txt"
             assert len(dset['tasks']) == len(dset['mix_ratio'])
             img_db = [all_img_dbs[path] for path in dset['img']]
         else:
@@ -142,6 +153,8 @@ def create_dataloaders(datasets, is_train, opts, all_img_dbs=None):
 
             if task.startswith('mlm'):
                 dataset = build_mlm_dataset(txt_db, img_db, is_train, opts)
+            elif task.startswith('txt'):
+                dataset = build_mlm_only_dataset(txt_db, is_train, opts)
             elif task.startswith('mrfr'):
                 dataset = build_mrfr_dataset(txt_db, img_db, is_train, opts)
             elif task.startswith('mrc'):
@@ -197,8 +210,8 @@ def main(opts):
     all_dbs = [db for datasets in [opts.train_datasets, opts.val_datasets]
                for dset in datasets for db in dset['db']]
 
-    tokenizer = json.load(open(f'{all_dbs[0]}/meta.json'))['bert']
-    assert all(tokenizer == json.load(open(f'{db}/meta.json'))['bert']
+    tokenizer = json.load(open(f'{all_dbs[0]}/meta.json'))['tokenizer']
+    assert all(tokenizer == json.load(open(f'{db}/meta.json'))['tokenizer']
                for db in all_dbs)
 
     # build data loaders
@@ -229,8 +242,8 @@ def main(opts):
     optimizer = build_optimizer(model, opts)
     task2scaler = {t: i for i, t in enumerate(train_dataloaders.keys())}
     model, optimizer = amp.initialize(model, optimizer,
-                                      num_losses=len(task2scaler),
-                                      enabled=opts.fp16, opt_level='O2')
+                                    num_losses=len(task2scaler),
+                                    enabled=opts.fp16, opt_level='O2', keep_batchnorm_fp32=True, min_loss_scale=1)
 
     global_step = 0
     LOGGER.info(f"***** Running training with {n_gpu} GPUs *****")
@@ -304,7 +317,7 @@ def main(opts):
                 # do this before unscaling to make sure every process uses
                 # the same gradient scale
                 grads = [p.grad.data for p in model.parameters()
-                         if p.requires_grad and p.grad is not None]
+                            if p.requires_grad and p.grad is not None]
                 all_reduce_and_rescale_tensors(grads, float(1))
         task2loss[name](loss.item())
 

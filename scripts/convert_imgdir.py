@@ -40,6 +40,8 @@ def load_npz(conf_th, max_bb, min_bb, num_bb, fname, keep_all=False):
         for key, arr in img_dump.items():
             if arr.dtype == np.float32:
                 arr = arr.astype(np.float16)
+            if (np.isinf(arr).any()):
+                raise ValueError(f"{key} Array of {fname} contains inf or nan values: {arr}")
             if arr.ndim == 2:
                 dump[key] = arr[:nbb, :]
             elif arr.ndim == 1:
@@ -115,6 +117,9 @@ def main(opts):
                   f'nbb_th{opts.conf_th}_'
                   f'max{opts.max_bb}_min{opts.min_bb}.json', 'w') as f:
             json.dump(name2nbb, f)
+    with open("data/ids.txt", "w") as f:
+        for k in name2nbb.keys():
+            f.write(f"{k.split('_')[-1].split('.')[0]}\n")
 
 
 if __name__ == '__main__':

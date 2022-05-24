@@ -1,0 +1,50 @@
+{
+    "output_dir": "/home/kristian/Thesis/out/UNITER/SBU/",
+    "model_config": "/home/kristian/Thesis/UNITER/config/uniter-base.json",
+    "checkpoint": "/home/kristian/Thesis/models/pretrained/uniter-base.pt",
+    "mrm_prob": 0.15,
+    "itm_neg_prob": 0.5,
+    "itm_ot_lambda": 0.1,
+    "max_txt_len": 60,
+    "conf_th": 0.0,
+    "max_bb": 100,
+    "min_bb": 10,
+    "num_bb": 36,
+    "train_batch_size": 10240,
+    "val_batch_size": 10240,
+    "gradient_accumulation_steps": 2,
+    "learning_rate": 5e-05,
+    "valid_steps": 200000,
+    "num_train_steps": 200000,
+    "optim": "adam",
+    "betas": [
+        0.9,
+        0.98
+    ],
+    "dropout": 0.1,
+    "weight_decay": 0.01,
+    "grad_norm": 5,
+    "warmup_steps": 10000,
+    "seed": 19,
+    "fp16": true,
+    "n_workers": 8,
+    "pin_mem": true,
+    "train_datasets": [
+        {
+            "name": "sbu",
+            "db": [
+                "/home/kristian/Thesis/data_uniter/sbu_new/txt"
+            ],
+            "img": [
+                "/home/kristian/Thesis/data_uniter/sbu_new"
+            ],
+            "tasks": [
+                "mlm"
+            ],
+            "mix_ratio": [
+                1
+            ]
+        }
+    ],
+    "val_datasets": []
+}
