@@ -20,6 +20,8 @@ from lz4.frame import compress, decompress
 
 import msgpack
 import msgpack_numpy
+
+from utils.logger import LOGGER
 msgpack_numpy.patch()
 
 
@@ -49,6 +51,7 @@ class DetectFeatLmdb(object):
     def __init__(self, img_dir, conf_th=0.2, max_bb=100, min_bb=10, num_bb=36,
                  compress=True):
         self.img_dir = img_dir
+        self.conf_th, self.min_bb, self.max_bb = conf_th, min_bb, max_bb
         if conf_th == -1:
             db_name = f'feat_numbb{num_bb}'
             self.name2nbb = defaultdict(lambda: num_bb)
@@ -79,7 +82,7 @@ class DetectFeatLmdb(object):
 
     def _compute_nbb(self):
         name2nbb = {}
-        fnames = json.loads(self.txn.get(key=b'__keys__').decode('utf-8'))
+        fnames = json.loads(self.txn.get(key=b'__keys__').tobytes().decode('utf-8'))
         for fname in tqdm(fnames, desc='reading images'):
             dump = self.txn.get(fname.encode('utf-8'))
             if self.compress:

@@ -197,8 +197,8 @@ def main(opts):
     all_dbs = [db for datasets in [opts.train_datasets, opts.val_datasets]
                for dset in datasets for db in dset['db']]
 
-    tokenizer = json.load(open(f'{all_dbs[0]}/meta.json'))['bert']
-    assert all(tokenizer == json.load(open(f'{db}/meta.json'))['bert']
+    tokenizer = json.load(open(f'{all_dbs[0]}/meta.json'))['tokenizer']
+    assert all(tokenizer == json.load(open(f'{db}/meta.json'))['tokenizer']
                for db in all_dbs)
 
     # build data loaders
@@ -229,8 +229,8 @@ def main(opts):
     optimizer = build_optimizer(model, opts)
     task2scaler = {t: i for i, t in enumerate(train_dataloaders.keys())}
     model, optimizer = amp.initialize(model, optimizer,
-                                      num_losses=len(task2scaler),
-                                      enabled=opts.fp16, opt_level='O2')
+                                    num_losses=len(task2scaler),
+                                    enabled=opts.fp16, opt_level='O2')
 
     global_step = 0
     LOGGER.info(f"***** Running training with {n_gpu} GPUs *****")
@@ -304,7 +304,7 @@ def main(opts):
                 # do this before unscaling to make sure every process uses
                 # the same gradient scale
                 grads = [p.grad.data for p in model.parameters()
-                         if p.requires_grad and p.grad is not None]
+                            if p.requires_grad and p.grad is not None]
                 all_reduce_and_rescale_tensors(grads, float(1))
         task2loss[name](loss.item())
 
