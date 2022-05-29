@@ -10,13 +10,30 @@ import pickle
 import os
 from os.path import exists
 
-from nltk.tokenize import word_tokenize
+from nltk.tokenize import word_tokenize, sent_tokenize
 from cytoolz import curry
 from tqdm import tqdm
 from pytorch_pretrained_bert import BertTokenizer
 
 from data.data import open_lmdb
 
+LABEL2ANS = {
+    "Single Family": 0,
+    "Condo": 1,
+    "Multiple Occupancy": 2,
+    "Vacant Land": 3,
+    "Townhouse": 4,
+    "Recreational": 5,
+    "Country House": 6,
+    "Villa": 0,
+    "Ejerlejlighed": 1,
+    "Kollektiv": 2,
+    "Helårsgrund": 3,
+    "Fritidsgrund": 3,
+    "Rækkehus": 4,
+    "Fritidsbolig": 5,
+    "Landejendom": 6
+}
 
 @curry
 def bert_tokenize(tokenizer, text):
@@ -101,6 +118,88 @@ def process_wit(captions, found_ids, db, tokenizer):
             input_ids = tokenizer(' '.join(tokens))
             example['input_ids'] = input_ids
             example['dataset_image_id'] = idx
+            txt2img[idx] = img_fname
+            img2txt[img_fname] = idx
+            id2len[idx] = len(input_ids)
+            db[idx] = example
+    
+    return id2len, txt2img, img2txt
+
+def process_dagw(captions, db, tokenizer):
+    id2len = {}
+    for idx, caption in tqdm(enumerate(captions), desc='processing DAGW'):
+        idx = str(idx)
+        example = {}
+        example['id'] = idx
+        example['sent'] = caption
+        tokens = word_tokenize(caption)
+        example['toked_caption'] = tokens
+        example['dataset'] = "DAGW"
+        example['split'] = "train"
+        input_ids = tokenizer(' '.join(tokens))
+        example['input_ids'] = input_ids
+        id2len[idx] = len(input_ids)
+        db[idx] = example
+    
+    return [id2len]
+
+def process_amhomes(captions, found_ids, db, tokenizer, split):
+    id2len = {}
+    txt2img = {} 
+    img2txt = {}
+    missing = 0
+    for idx, home in tqdm(captions.items(), desc=f"Processing Amhomes {split}"):
+        if idx in found_ids:
+            example = {}
+            img_fname = f"{idx}.npz"
+            example['id'] = idx
+            example['image_id'] = idx
+            example['img_fname'] = img_fname
+            sent = sent_tokenize(home["description"], language='english')
+            if len(sent) == 0:
+                sent = ["Beautiful house!"]
+                missing += 1
+            example['sent'] = sent[0]
+            tokens = word_tokenize(sent[0])
+            example['toked_caption'] = tokens
+            example['dataset'] = "SmallH"
+            example['split'] = split
+            input_ids = tokenizer(' '.join(tokens))
+            example['input_ids'] = input_ids
+            example['dataset_image_id'] = idx
+            example['target'] = LABEL2ANS[home["homeType"]]
+            txt2img[idx] = img_fname
+            img2txt[img_fname] = idx
+            id2len[idx] = len(input_ids)
+            db[idx] = example
+    
+    print(f"For {split} there were a total of {missing} missing descriptions...")
+    
+    return id2len, txt2img, img2txt
+
+def process_danhomes(captions, found_ids, db, tokenizer, split):
+    id2len = {}
+    txt2img = {} 
+    img2txt = {}
+    for idx, home in tqdm(captions.items(), desc=f"Processing DanHomes {split}"):
+        if idx in found_ids:
+            example = {}
+            img_fname = f"danhomes_{idx}.npz"
+            example['id'] = idx
+            example['image_id'] = idx
+            example['img_fname'] = img_fname
+            sent = sent_tokenize(home["DescriptionPlain"], language='danish')
+            if len(sent) == 0:
+                continue
+            example['sent'] = sent[0]
+            tokens = word_tokenize(sent[0])
+            example['toked_caption'] = tokens
+            example['dataset'] = "DanHomes"
+            example['split'] = split
+            input_ids = tokenizer(' '.join(tokens))
+            example['input_ids'] = input_ids
+            example['dataset_image_id'] = idx
+            example['target'] = LABEL2ANS[home["Type"]]
             txt2img[idx] = img_fname
             img2txt[img_fname] = idx
             id2len[idx] = len(input_ids)
@@ -210,6 +309,22 @@ def main(opts):
             found_ids = list(map(lambda x: int(x), found_ids[:-1]))
             jsons = process_wit(captions, found_ids, db, tokenizer)
             output_field_name = ['id2len', 'txt2img', 'img2txt']
+        elif opts.task == "dagw":
+            captions = json.load(open(opts.annotations[0]))
+            jsons = process_dagw(captions, db, tokenizer)
+            output_field_name = ['id2len']
+        elif opts.task == "amhomes":
+            captions = json.load(open(opts.annotations[0]))
+            found_ids = open(opts.missing_imgs).read().split("\n")
+            # found_ids = list(map(lambda x: int(x), found_ids[:-1]))
+            jsons = process_amhomes(captions, found_ids, db, tokenizer, opts.split)
+            output_field_name = ['id2len', 'txt2img', 'img2txt']
+        elif opts.task == "danhomes":
+            captions = json.load(open(opts.annotations[0]))
+            found_ids = open(opts.missing_imgs).read().split("\n")
+            # found_ids = list(map(lambda x: int(x), found_ids[:-1]))
+            jsons = process_danhomes(captions, found_ids, db, tokenizer, opts.split)
+            output_field_name = ['id2len', 'txt2img', 'img2txt']
         elif opts.task == 're':
             data = pickle.load(open(opts.annotations[0], 'rb'))
             instances = json.load(open(opts.annotations[1], 'r'))
@@ -238,7 +353,9 @@ if __name__ == '__main__':
     parser.add_argument('--output', required=True,
                         help='output dir of DB')
     parser.add_argument('--task', required=True, default='nlvr',
-                        choices=['nlvr', 're', 'sbu', 'wit'])
+                        choices=['nlvr', 're', 'sbu', 'wit', 'dagw', 'amhomes', 'danhomes'])
+    parser.add_argument('--split', required=True, default='train',
+                        choices=['train', 'val', 'test'])
     parser.add_argument('--toker', default='bert-base-cased',
                         help='which BERT tokenizer to used')
     args = parser.parse_args()

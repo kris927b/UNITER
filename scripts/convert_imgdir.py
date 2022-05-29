@@ -41,7 +41,7 @@ def load_npz(conf_th, max_bb, min_bb, num_bb, fname, keep_all=False):
             if arr.dtype == np.float32:
                 arr = arr.astype(np.float16)
             if (np.isinf(arr).any()):
-                raise ValueError(f"{key} Array of {fname} contains inf or nan values: {arr}")
+                raise ValueError(f"{key} Array of {fname} contains inf or nan values")
             if arr.ndim == 2:
                 dump[key] = arr[:nbb, :]
             elif arr.ndim == 1:
