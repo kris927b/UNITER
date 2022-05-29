@@ -96,7 +96,7 @@ def imgcls_eval_collate(inputs):
     (qids, input_ids, img_feats, img_pos_feats, attn_masks, targets
      ) = map(list, unzip(inputs))
 
-    if input_ids[0]:
+    if input_ids[0] is not None:
         txt_lens = [i.size(0) for i in input_ids]
 
         input_ids = pad_sequence(input_ids, batch_first=True, padding_value=0)

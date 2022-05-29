@@ -89,7 +89,7 @@ def main(opts):
             all_logits.update(id2logit)
     if hvd.rank() == 0:
         with open(f'{result_dir}/'
-                  f'results_{opts.checkpoint}_img.json', 'w') as f:
+                  f'results_{opts.checkpoint}_all.json', 'w') as f:
             json.dump(all_results, f)
         if opts.save_logits:
             np.savez(f'{result_dir}/logits_{opts.checkpoint}_all.npz',
@@ -107,7 +107,7 @@ def evaluate(model, eval_loader, label2ans, save_logits=False):
     for i, batch in enumerate(eval_loader):
         qids = batch['qids']
         scores = model(batch, compute_loss=False)
-        answers = [label2ans[i]
+        answers = [label2ans.get(i, label2ans[6])
                    for i in scores.max(dim=-1, keepdim=False
                                        )[1].cpu().tolist()]
         for qid, answer in zip(qids, answers):
